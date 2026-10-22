@@ -1,0 +1,457 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Three-hour package planner</title>
+<style>
+  :root {
+    --ink: #1b2a41;
+    --muted: #4a5568;
+    --bg: #ffffff;
+    --panel: #f5f7fa;
+    --line: #c9d1dc;
+    --focus: #0b57d0;
+    --warn-bg: #fdf3e1;
+    --warn-line: #b36b00;
+    --ok-bg: #e8f3ec;
+    --ok-line: #2d6a4f;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Arial, sans-serif; color: var(--ink); background: var(--bg); }
+  main { max-width: 62rem; margin: 0 auto; padding: 1.5rem 1rem 4rem; }
+  h1 { font-size: 1.9rem; margin: 0 0 .25rem; }
+  h2 { font-size: 1.25rem; margin: 2rem 0 .75rem; }
+  p.lead { margin: 0 0 1.25rem; color: var(--muted); max-width: 46rem; }
+  label { display: block; font-weight: 600; margin-bottom: .25rem; }
+  .hint { font-weight: 400; color: var(--muted); font-size: .9rem; }
+  input[type=text], input[type=number], textarea {
+    width: 100%; font: inherit; color: var(--ink); background: #fff;
+    border: 1px solid #6b7686; border-radius: 6px; padding: .5rem .65rem;
+  }
+  textarea { min-height: 4.5rem; resize: vertical; }
+  :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+  button {
+    font: inherit; font-weight: 600; color: var(--ink); background: #fff;
+    border: 1px solid #6b7686; border-radius: 6px; padding: .45rem .8rem; cursor: pointer;
+  }
+  button:hover { background: #eef2f7; }
+  button.primary { background: #1f4f99; border-color: #1f4f99; color: #fff; }
+  button.primary:hover { background: #173d78; }
+  button.danger { color: #8a1c1c; border-color: #8a1c1c; }
+  button:disabled { color: #6b7686; border-color: #b8c0cc; cursor: not-allowed; background: #f3f5f8; }
+  .row { display: grid; gap: 1rem; grid-template-columns: 1fr 1fr 10rem; align-items: end; }
+  @media (max-width: 40rem) { .row { grid-template-columns: 1fr; } }
+  .toolbar { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+
+  /* time summary */
+  .summary { position: sticky; top: 0; z-index: 2; background: var(--bg); padding: .75rem 0; border-bottom: 1px solid var(--line); margin-top: 1rem; }
+  .bar { display: flex; height: 3rem; border: 1px solid #6b7686; border-radius: 6px; overflow: hidden; background: var(--panel); }
+  .seg { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; font-size: .8rem; line-height: 1.15; font-weight: 700; overflow: hidden; overflow-wrap: anywhere; min-width: 3.25rem; padding: 0 .15rem; border-left: 1px solid #6b7686; color: #1b2a41; }
+  .seg:first-child { border-left: 0; }
+  .status { margin: .6rem 0 0; padding: .5rem .75rem; border-radius: 6px; border: 1px solid; font-weight: 600; }
+  .status.ok { background: var(--ok-bg); border-color: var(--ok-line); }
+  .status.warn { background: var(--warn-bg); border-color: var(--warn-line); }
+  .status.info { background: var(--panel); border-color: var(--line); }
+
+  /* stages */
+  ol.stages { list-style: none; margin: 0; padding: 0; display: grid; gap: 1rem; }
+  .stage { border: 1px solid var(--line); border-left-width: 10px; border-radius: 8px; padding: 1rem; background: var(--panel); }
+  .stage fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+  .stage legend { font-weight: 700; font-size: 1.05rem; padding: 0; margin-bottom: .75rem; }
+  .stage .grid { display: grid; gap: .9rem; grid-template-columns: 1fr 8rem; }
+  @media (max-width: 40rem) { .stage .grid { grid-template-columns: 1fr; } }
+  .stage .full { grid-column: 1 / -1; }
+  .stage .actions { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .9rem; }
+  .empty { border: 1px dashed #6b7686; border-radius: 8px; padding: 1.25rem; background: var(--panel); }
+
+  /* print view */
+  #printView { display: none; }
+  @media print {
+    body > main { display: none; }
+    #printView { display: block; padding: 0; font-size: 11pt; }
+    #printView h1 { font-size: 20pt; }
+    #printView h2 { font-size: 14pt; margin: 1rem 0 .25rem; break-after: avoid; }
+    #printView table { border-collapse: collapse; width: 100%; margin: .5rem 0 1rem; }
+    #printView th, #printView td { border: 1px solid #555; padding: 4pt 6pt; text-align: left; vertical-align: top; }
+    #printView .st { break-inside: avoid; }
+    #printView p { margin: .2rem 0; white-space: pre-wrap; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Three-hour package planner</h1>
+  <p class="lead">Sketch your learning package as a series of parts, then add approximate minutes. Your work saves in this browser as you type. Use the save options near the end of the page to keep a copy on your own computer.</p>
+
+  <section aria-labelledby="about-h">
+    <h2 id="about-h">About your package</h2>
+    <div class="row">
+      <div>
+        <label for="title">Package title</label>
+        <input type="text" id="title" autocomplete="off">
+      </div>
+      <div>
+        <label for="audience">Target audience</label>
+        <span class="hint" id="audience-h" style="display:block;margin-bottom:.25rem">Who is it for, and what do they already know?</span>
+        <input type="text" id="audience" autocomplete="off" aria-describedby="audience-h">
+      </div>
+      <div>
+        <label for="total">Total minutes</label>
+        <input type="number" id="total" min="15" max="600" step="5">
+      </div>
+    </div>
+    <div style="margin-top:1rem">
+      <label for="objective">Learning objective</label>
+      <span class="hint" id="objective-h" style="display:block;margin-bottom:.25rem">By the end of the package, learners will be able to&hellip;</span>
+      <textarea id="objective" aria-describedby="objective-h"></textarea>
+    </div>
+  </section>
+
+  <div class="summary" role="region" aria-label="Time summary">
+    <div class="bar" id="bar" aria-hidden="true"></div>
+    <p class="status info" id="status" role="status" aria-live="polite"></p>
+  </div>
+
+  <section aria-labelledby="stages-h">
+    <h2 id="stages-h">Your parts</h2>
+    <div class="toolbar" style="margin-bottom:1rem">
+      <button type="button" class="primary" id="exampleBtn">Start from an Example</button>
+      <button type="button" class="primary" id="addBtn">Add a part</button>
+      <button type="button" class="danger" id="clearBtn">Clear everything</button>
+    </div>
+    <div id="empty" class="empty" hidden>
+      <p style="margin:0">No parts yet. Start from an Example (Orient, Learn, Practise, Apply, Reflect or assess) and change it to suit your context, or add your first part.</p>
+    </div>
+    <ol class="stages" id="stages"></ol>
+  </section>
+
+  <section aria-labelledby="save-h">
+    <h2 id="save-h">Save your plan to your computer</h2>
+    <div class="toolbar">
+      <button type="button" class="primary" id="docxBtn">Word (.docx)</button>
+      <button type="button" class="primary" id="pptxBtn">PowerPoint (.pptx)</button>
+      <button type="button" class="primary" id="pdfBtn">PDF (opens print dialog)</button>
+      <button type="button" id="jsonBtn">Save to reopen later (.json)</button>
+      <button type="button" id="loadBtn">Open a saved .json file</button>
+      <input type="file" id="loadFile" accept=".json,application/json" hidden>
+    </div>
+    <p class="hint" id="exportMsg" role="status" aria-live="polite" style="margin-top:.75rem"></p>
+    <p class="hint">For PDF, choose “Save as PDF” as the destination in the print dialog. Your plan stays on your computer; nothing is uploaded.</p>
+  </section>
+</main>
+
+<div id="printView" aria-hidden="true"></div>
+
+<script src="vendor/docx.iife.js"></script>
+<script src="vendor/pptxgen.bundle.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  // Colours follow the example slide. text = readable colour on that fill.
+  var COLOURS = [
+    { fill: '2A5BA8', tint: 'B4C6E1', text: 'FFFFFF' },
+    { fill: '93ABB1', tint: 'B8C8CC', text: '1B2A41' },
+    { fill: 'E8A640', tint: 'EEBD72', text: '1B2A41' },
+    { fill: 'A0A58B', tint: 'C3C6B6', text: '1B2A41' },
+    { fill: 'A39A8E', tint: 'CAC4BD', text: '1B2A41' }
+  ];
+  var EXAMPLE = [
+    { name: 'Orient', mins: 10, purpose: 'Why this matters', tool: '', activity: '', udl: '', notes: '' },
+    { name: 'Learn', mins: 50, purpose: 'Core concepts or examples', tool: '', activity: '', udl: '', notes: '' },
+    { name: 'Practise', mins: 50, purpose: 'Guided activity and feedback', tool: '', activity: '', udl: '', notes: '' },
+    { name: 'Apply', mins: 45, purpose: 'Scenario, case or task', tool: '', activity: '', udl: '', notes: '' },
+    { name: 'Reflect or assess', mins: 25, purpose: 'Check understanding and next steps', tool: '', activity: '', udl: '', notes: '' }
+  ];
+  var KEY = 'threeHourPlanner.v1';
+  var state = load() || { title: '', audience: '', objective: '', total: 180, stages: [] };
+
+  var $ = function (id) { return document.getElementById(id); };
+  function uid() { return 's' + Math.random().toString(36).slice(2, 9); }
+  function colour(i) { return COLOURS[i % COLOURS.length]; }
+  function hex(c) { return '#' + c; }
+  function num(v) { var n = parseInt(v, 10); return isNaN(n) || n < 0 ? 0 : n; }
+
+  function load() {
+    try { var s = JSON.parse(localStorage.getItem(KEY)); return s && Array.isArray(s.stages) ? normalise(s) : null; }
+    catch (e) { return null; }
+  }
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* storage unavailable */ } }
+  function normalise(s) {
+    return {
+      title: String(s.title || ''), audience: String(s.audience || ''), objective: String(s.objective || ''),
+      total: num(s.total) || 180,
+      stages: s.stages.map(function (x) {
+        return { id: uid(), name: String(x.name || ''), mins: num(x.mins), purpose: String(x.purpose || x.outcome || ''), tool: String(x.tool || ''), activity: String(x.activity || ''), udl: String(x.udl || ''), notes: String(x.notes || '') };
+      })
+    };
+  }
+  function used() { return state.stages.reduce(function (a, s) { return a + s.mins; }, 0); }
+  function stageName(s, i) { return s.name.trim() || 'Part ' + (i + 1); }
+
+  /* ---------- rendering ---------- */
+  function renderMeta() {
+    $('title').value = state.title; $('audience').value = state.audience; $('objective').value = state.objective; $('total').value = state.total;
+  }
+
+  function renderSummary() {
+    var u = used(), t = state.total, bar = $('bar');
+    bar.innerHTML = '';
+    var scale = Math.max(u, t) || 1;
+    state.stages.forEach(function (s, i) {
+      if (!s.mins) return;
+      var d = document.createElement('div');
+      d.className = 'seg';
+      d.style.width = (s.mins / scale * 100) + '%';
+      d.style.background = hex(colour(i).tint);
+      var n1 = document.createElement('span'); n1.textContent = stageName(s, i);
+      var n2 = document.createElement('span'); n2.textContent = s.mins + ' min';
+      d.appendChild(n1); d.appendChild(n2);
+      bar.appendChild(d);
+    });
+    var st = $('status'), diff = t - u, msg, cls;
+    if (!state.stages.length) { msg = 'No parts yet. Target: ' + t + ' minutes.'; cls = 'info'; }
+    else if (diff === 0) { msg = u + ' of ' + t + ' minutes planned. The plan fits exactly.'; cls = 'ok'; }
+    else if (diff > 0) { msg = u + ' of ' + t + ' minutes planned. ' + diff + ' minutes still unassigned.'; cls = 'warn'; }
+    else { msg = u + ' of ' + t + ' minutes planned. Over by ' + (-diff) + ' minutes.'; cls = 'warn'; }
+    st.textContent = msg; st.className = 'status ' + cls;
+  }
+
+  function field(parent, cls, labelText, hint, el, id) {
+    var w = document.createElement('div'); if (cls) w.className = cls;
+    var l = document.createElement('label'); l.htmlFor = id; l.textContent = labelText;
+    if (hint) { var h = document.createElement('span'); h.className = 'hint'; h.textContent = ' ' + hint; l.appendChild(h); }
+    w.appendChild(l); w.appendChild(el); parent.appendChild(w); return w;
+  }
+
+  function renderStages(focusSel) {
+    var ol = $('stages'); ol.innerHTML = '';
+    $('empty').hidden = state.stages.length > 0;
+    state.stages.forEach(function (s, i) {
+      var li = document.createElement('li'); li.className = 'stage';
+      li.style.borderLeftColor = hex(colour(i).fill);
+      var fs = document.createElement('fieldset');
+      var lg = document.createElement('legend'); lg.textContent = 'Part ' + (i + 1) + ' of ' + state.stages.length;
+      fs.appendChild(lg);
+      var g = document.createElement('div'); g.className = 'grid';
+
+      var name = document.createElement('input'); name.type = 'text'; name.id = 'n-' + s.id; name.value = s.name; name.autocomplete = 'off';
+      name.addEventListener('input', function () { s.name = name.value; renderSummary(); save(); });
+      field(g, '', 'Name', '', name, name.id);
+
+      var mins = document.createElement('input'); mins.type = 'number'; mins.id = 'm-' + s.id; mins.min = 0; mins.max = 600; mins.step = 5; mins.value = s.mins;
+      mins.addEventListener('input', function () { s.mins = num(mins.value); renderSummary(); save(); });
+      field(g, '', 'Minutes', '', mins, mins.id);
+
+      [['purpose', 'Purpose', '', true], ['tool', 'Tool', '', false], ['activity', 'Activity or resource', '', true], ['udl', 'Accessibility/UDL', '', true], ['notes', 'Notes', '(optional)', true]].forEach(function (d) {
+        var el = document.createElement(d[3] ? 'textarea' : 'input');
+        if (!d[3]) { el.type = 'text'; el.autocomplete = 'off'; }
+        el.id = d[0] + '-' + s.id; el.value = s[d[0]];
+        el.addEventListener('input', function () { s[d[0]] = el.value; save(); });
+        field(g, 'full', d[1], d[2], el, el.id);
+      });
+
+      fs.appendChild(g);
+      var act2 = document.createElement('div'); act2.className = 'actions';
+      var nm = stageName(s, i);
+      function btn(text, label, fn, disabled, id, cls) {
+        var b = document.createElement('button'); b.type = 'button'; b.textContent = text; b.setAttribute('aria-label', label);
+        if (cls) b.className = cls; b.disabled = !!disabled; b.id = id; b.addEventListener('click', fn); act2.appendChild(b);
+      }
+      btn('Move up', 'Move ' + nm + ' up', function () { move(i, -1, 'up-' + s.id); }, i === 0, 'up-' + s.id);
+      btn('Move down', 'Move ' + nm + ' down', function () { move(i, 1, 'dn-' + s.id); }, i === state.stages.length - 1, 'dn-' + s.id);
+      btn('Duplicate', 'Duplicate ' + nm, function () { dup(i); }, false, 'dup-' + s.id);
+      btn('Remove', 'Remove ' + nm, function () { remove(i); }, false, 'rm-' + s.id, 'danger');
+      fs.appendChild(act2);
+      li.appendChild(fs); ol.appendChild(li);
+    });
+    if (focusSel) { var f = document.getElementById(focusSel); if (f && !f.disabled) f.focus(); }
+    renderSummary();
+  }
+
+  /* ---------- actions ---------- */
+  function move(i, d, focusId) {
+    var j = i + d; if (j < 0 || j >= state.stages.length) return;
+    var t = state.stages[i]; state.stages[i] = state.stages[j]; state.stages[j] = t;
+    save(); renderStages(focusId);
+    announce('Moved ' + stageName(t, j) + ' to position ' + (j + 1) + ' of ' + state.stages.length + '.');
+  }
+  function dup(i) {
+    var c = JSON.parse(JSON.stringify(state.stages[i])); c.id = uid(); c.name = c.name ? c.name + ' (copy)' : '';
+    state.stages.splice(i + 1, 0, c); save(); renderStages('n-' + c.id);
+  }
+  function remove(i) {
+    var nm = stageName(state.stages[i], i);
+    if (!confirm('Remove "' + nm + '"?')) return;
+    state.stages.splice(i, 1); save(); renderStages('addBtn');
+    announce('Removed ' + nm + '.');
+  }
+  function announce(m) { $('exportMsg').textContent = m; }
+
+  $('addBtn').addEventListener('click', function () {
+    var s = { id: uid(), name: '', mins: 0, purpose: '', tool: '', activity: '', udl: '', notes: '' };
+    state.stages.push(s); save(); renderStages('n-' + s.id);
+  });
+  $('exampleBtn').addEventListener('click', function () {
+    if (state.stages.length && !confirm('Replace your current parts with the example?')) return;
+    state.stages = EXAMPLE.map(function (x) { var c = JSON.parse(JSON.stringify(x)); c.id = uid(); return c; });
+    state.total = 180; renderMeta(); save(); renderStages('n-' + state.stages[0].id);
+  });
+  $('clearBtn').addEventListener('click', function () {
+    if (!confirm('Clear the title, audience and all parts? Save a copy first if you want to keep them.')) return;
+    state = { title: '', audience: '', objective: '', total: 180, stages: [] }; save(); renderMeta(); renderStages('addBtn');
+  });
+  $('title').addEventListener('input', function (e) { state.title = e.target.value; save(); });
+  $('audience').addEventListener('input', function (e) { state.audience = e.target.value; save(); });
+  $('objective').addEventListener('input', function (e) { state.objective = e.target.value; save(); });
+  $('total').addEventListener('input', function (e) { state.total = num(e.target.value) || 180; renderSummary(); save(); });
+
+  /* ---------- exports ---------- */
+  function slug() { return (state.title.trim() || 'three-hour-package').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'three-hour-package'; }
+  function download(blob, name) {
+    var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 1500);
+  }
+  function lines(t) { return String(t || '').split(/\r?\n/); }
+  function parts(s) { return [['Purpose', s.purpose], ['Tool', s.tool], ['Activity or resource', s.activity], ['Accessibility/UDL', s.udl], ['Notes', s.notes]]; }
+  function docTitle() { return state.title.trim() || 'Three-hour package plan'; }
+
+  $('jsonBtn').addEventListener('click', function () {
+    var out = { type: 'three-hour-package-plan', version: 1, title: state.title, audience: state.audience, objective: state.objective, total: state.total,
+      stages: state.stages.map(function (s) { return { name: s.name, mins: s.mins, purpose: s.purpose, tool: s.tool, activity: s.activity, udl: s.udl, notes: s.notes }; }) };
+    download(new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' }), slug() + '.json');
+    announce('Saved ' + slug() + '.json. Check your Downloads folder.');
+  });
+  $('loadBtn').addEventListener('click', function () { $('loadFile').click(); });
+  $('loadFile').addEventListener('change', function (e) {
+    var f = e.target.files[0]; if (!f) return;
+    var r = new FileReader();
+    r.onload = function () {
+      try {
+        var s = JSON.parse(r.result);
+        if (!s || !Array.isArray(s.stages)) throw new Error('bad');
+        state = normalise(s); save(); renderMeta(); renderStages('addBtn');
+        announce('Opened ' + f.name + '.');
+      } catch (err) { announce('That file could not be read as a saved plan.'); }
+      e.target.value = '';
+    };
+    r.readAsText(f);
+  });
+
+  $('docxBtn').addEventListener('click', function () {
+    try {
+      var D = window.docx;
+      var kids = [];
+      kids.push(new D.Paragraph({ heading: D.HeadingLevel.TITLE, children: [new D.TextRun(docTitle())] }));
+      kids.push(new D.Paragraph({ children: [new D.TextRun({ text: 'Target audience: ', bold: true }), new D.TextRun(state.audience.trim())] }));
+      kids.push(new D.Paragraph({ children: [new D.TextRun({ text: 'Learning objective: ', bold: true }), new D.TextRun(state.objective.trim())] }));
+      kids.push(new D.Paragraph({ children: [new D.TextRun({ text: 'Time: ', bold: true }), new D.TextRun(used() + ' of ' + state.total + ' minutes planned')] }));
+      kids.push(new D.Paragraph({ heading: D.HeadingLevel.HEADING_1, children: [new D.TextRun('Overview')] }));
+      function cell(t, bold, w) {
+        return new D.TableCell({ width: { size: w, type: D.WidthType.PERCENTAGE }, margins: { top: 60, bottom: 60, left: 100, right: 100 },
+          children: [new D.Paragraph({ children: [new D.TextRun({ text: String(t), bold: !!bold })] })] });
+      }
+      var rows = [new D.TableRow({ tableHeader: true, children: [cell('Part', true, 10), cell('Name', true, 60), cell('Minutes', true, 30)] })];
+      state.stages.forEach(function (s, i) { rows.push(new D.TableRow({ children: [cell(i + 1, false, 10), cell(stageName(s, i), false, 60), cell(s.mins, false, 30)] })); });
+      rows.push(new D.TableRow({ children: [cell('', false, 10), cell('Total', true, 60), cell(used(), true, 30)] }));
+      kids.push(new D.Table({ width: { size: 100, type: D.WidthType.PERCENTAGE }, rows: rows }));
+      state.stages.forEach(function (s, i) {
+        kids.push(new D.Paragraph({ heading: D.HeadingLevel.HEADING_1, children: [new D.TextRun(stageName(s, i) + ' (' + s.mins + ' min)')] }));
+        parts(s).forEach(function (p) {
+          kids.push(new D.Paragraph({ heading: D.HeadingLevel.HEADING_2, children: [new D.TextRun(p[0])] }));
+          lines(p[1]).forEach(function (ln) { kids.push(new D.Paragraph({ children: [new D.TextRun(ln)] })); });
+          if (!p[1].trim()) kids.push(new D.Paragraph({ children: [new D.TextRun('')] }));
+        });
+      });
+      var doc = new D.Document({
+        title: docTitle(),
+        styles: { default: { document: { run: { font: 'Arial', size: 24 } } } },
+        sections: [{ children: kids }]
+      });
+      D.Packer.toBlob(doc).then(function (b) { download(b, slug() + '.docx'); announce('Saved ' + slug() + '.docx. Check your Downloads folder.'); })
+        .catch(function () { announce('Word export failed.'); });
+    } catch (e) { announce('Word export failed: ' + e.message); }
+  });
+
+  $('pptxBtn').addEventListener('click', function () {
+    try {
+      var p = new window.PptxGenJS();
+      p.layout = 'LAYOUT_WIDE'; // 13.33 x 7.5 in
+      p.title = docTitle();
+      var INK = '1B2A41', FONT = 'Arial';
+      var s1 = p.addSlide();
+      s1.addText(docTitle(), { x: 0.7, y: 2.3, w: 11.9, h: 1.4, fontFace: FONT, fontSize: 40, bold: true, color: INK, valign: 'bottom' });
+      s1.addText('Target audience: ' + state.audience.trim() + '\n' + used() + ' of ' + state.total + ' minutes planned',
+        { x: 0.7, y: 3.9, w: 11.9, h: 1.2, fontFace: FONT, fontSize: 22, color: '4A5568', valign: 'top' });
+      var sObj = p.addSlide();
+      sObj.addText('Learning objective', { x: 0.7, y: 0.4, w: 11.9, h: 0.8, fontFace: FONT, fontSize: 32, bold: true, color: INK });
+      sObj.addText(state.objective.trim() || ' ', { x: 0.7, y: 1.5, w: 11.9, h: 5.2, fontFace: FONT, fontSize: 26, color: INK, valign: 'top', fit: 'shrink' });
+
+      var rowsDef = [['name', 0.7], ['purpose', 1.1], ['tool', 0.8], ['activity', 1.0], ['udl', 1.0], ['mins', 0.6]];
+      for (var c0 = 0; c0 < state.stages.length; c0 += 5) {
+        var s2 = p.addSlide();
+        s2.addText(c0 ? 'Overview (continued)' : 'Overview', { x: 0.7, y: 0.4, w: 11.9, h: 0.8, fontFace: FONT, fontSize: 32, bold: true, color: INK });
+        var gap = 0.15, bw = (11.93 - gap * 4) / 5;
+        state.stages.slice(c0, c0 + 5).forEach(function (s, j) {
+          var i = c0 + j, x = 0.7 + j * (bw + gap), y = 1.4, k = colour(i);
+          rowsDef.forEach(function (rd) {
+            var key = rd[0], h = rd[1];
+            if (key === 'name') {
+              s2.addText(stageName(s, i), { x: x, y: y, w: bw, h: h, fontFace: FONT, fontSize: 16, bold: true, align: 'center', valign: 'middle', color: k.text, fill: { color: k.fill }, shape: p.ShapeType.roundRect, rectRadius: 0.08, fit: 'shrink' });
+            } else {
+              s2.addText(key === 'mins' ? s.mins + ' min' : (s[key] || ''), { x: x, y: y, w: bw, h: h, fontFace: FONT, fontSize: key === 'mins' ? 18 : 13, bold: key === 'mins', align: 'center', valign: 'middle', color: INK, fill: { color: 'F5F7FA' }, fit: 'shrink' });
+            }
+            y += h + 0.1;
+          });
+        });
+      }
+
+      state.stages.forEach(function (s, i) {
+        var sl = p.addSlide(), k = colour(i);
+        sl.addShape(p.ShapeType.rect, { x: 0, y: 0, w: 0.35, h: 7.5, fill: { color: k.fill }, line: { color: k.fill } });
+        sl.addText(stageName(s, i) + ' (' + s.mins + ' min)', { x: 0.8, y: 0.4, w: 11.9, h: 0.9, fontFace: FONT, fontSize: 32, bold: true, color: INK });
+        var runs = [];
+        parts(s).forEach(function (pair) {
+          runs.push({ text: pair[0], options: { bold: true, fontSize: 20, color: '2A5BA8', breakLine: true } });
+          lines(pair[1]).forEach(function (ln) { runs.push({ text: ln || ' ', options: { fontSize: 20, color: INK, breakLine: true } }); });
+          runs.push({ text: ' ', options: { fontSize: 10, breakLine: true } });
+        });
+        sl.addText(runs, { x: 0.8, y: 1.5, w: 11.9, h: 5.3, fontFace: FONT, valign: 'top', fit: 'shrink' });
+      });
+      p.writeFile({ fileName: slug() + '.pptx' }).then(function () { announce('Saved ' + slug() + '.pptx. Check your Downloads folder.'); })
+        .catch(function () { announce('PowerPoint export failed.'); });
+    } catch (e) { announce('PowerPoint export failed: ' + e.message); }
+  });
+
+  function buildPrintView() {
+    var pv = $('printView'); pv.innerHTML = '';
+    function el(tag, text, parent) { var e = document.createElement(tag); if (text !== undefined) e.textContent = text; (parent || pv).appendChild(e); return e; }
+    el('h1', docTitle());
+    var pa = el('p'); el('strong', 'Target audience: ', pa); pa.appendChild(document.createTextNode(state.audience.trim() || '\u00a0'));
+    var po = el('p'); el('strong', 'Learning objective: ', po); po.appendChild(document.createTextNode(state.objective.trim() || '\u00a0'));
+    el('p', used() + ' of ' + state.total + ' minutes planned');
+    var t = el('table'); var cap = el('caption', 'Overview of parts and minutes', t); cap.style.textAlign = 'left';
+    var hr = el('tr', undefined, t); ['Part', 'Name', 'Minutes'].forEach(function (h) { el('th', h, hr).scope = 'col'; });
+    state.stages.forEach(function (s, i) { var r = el('tr', undefined, t); el('td', String(i + 1), r); el('td', stageName(s, i), r); el('td', String(s.mins), r); });
+    var tr = el('tr', undefined, t); el('td', '', tr); el('th', 'Total', tr).scope = 'row'; el('td', String(used()), tr);
+    state.stages.forEach(function (s, i) {
+      var d = el('div'); d.className = 'st';
+      el('h2', stageName(s, i) + ' (' + s.mins + ' min)', d);
+      parts(s).forEach(function (pair) {
+        var p = el('p', undefined, d); var b = el('strong', pair[0] + ': ', p); p.appendChild(document.createTextNode(pair[1].trim() || '\u00a0'));
+      });
+    });
+  }
+  $('pdfBtn').addEventListener('click', function () {
+    buildPrintView();
+    var prev = document.title; document.title = slug();
+    window.print();
+    document.title = prev;
+  });
+
+  renderMeta(); renderStages();
+})();
+</script>
+</body>
+</html>
