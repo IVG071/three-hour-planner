@@ -44,6 +44,13 @@
   @media (max-width: 40rem) { .row { grid-template-columns: 1fr; } }
   .toolbar { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
 
+  .var-grid { display: grid; gap: 1rem; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  @media (max-width: 40rem) { .var-grid { grid-template-columns: 1fr; } }
+  .var-col label { border: 1px solid #6b7686; border-radius: 6px; padding: .5rem .75rem; text-align: center; color: var(--ink); }
+  .var-col .hint { display: block; background: var(--panel); border-radius: 6px; padding: .5rem .75rem; margin: .5rem 0; color: var(--ink); min-height: 4.2rem; }
+  .var-col textarea { min-height: 8rem; }
+  ::placeholder { color: var(--muted); opacity: 1; }
+
   /* time summary */
   .summary { position: sticky; top: 0; z-index: 2; background: var(--bg); padding: .75rem 0; border-bottom: 1px solid var(--line); margin-top: 1rem; }
   .bar { display: flex; height: 3rem; border: 1px solid #6b7686; border-radius: 6px; overflow: hidden; background: var(--panel); }
@@ -101,11 +108,17 @@
         <input type="number" id="total" min="15" max="600" step="5">
       </div>
     </div>
-    <div style="margin-top:1rem">
-      <label for="objective">Learning objective</label>
-      <span class="hint" id="objective-h" style="display:block;margin-bottom:.25rem">By the end of the package, learners will be able to&hellip;</span>
-      <textarea id="objective" aria-describedby="objective-h"></textarea>
-    </div>
+  </section>
+
+  <section aria-labelledby="var-h">
+    <h2 id="var-h">Map learner variability</h2>
+    <div class="var-grid" id="varGrid"></div>
+  </section>
+
+  <section aria-labelledby="obj-h">
+    <h2 id="obj-h">Learning objective</h2>
+    <span class="hint" id="objective-h" style="display:block;margin-bottom:.25rem">By the end of the package, learners will be able to&hellip;</span>
+    <textarea id="objective" aria-labelledby="obj-h" aria-describedby="objective-h"></textarea>
   </section>
 
   <div class="summary" role="region" aria-label="Time summary">
@@ -164,8 +177,13 @@
     { name: 'Apply', mins: 45, purpose: 'Scenario, case or task', tool: '', activity: '', udl: '', notes: '' },
     { name: 'Reflect or assess', mins: 25, purpose: 'Check understanding and next steps', tool: '', activity: '', udl: '', notes: '' }
   ];
+  var VARIABILITY = [
+    { key: 'context', label: 'Learner context', prompt: 'role, location, workload, prior experience', tint: 'B4C6E1' },
+    { key: 'barrier', label: 'Possible barrier', prompt: 'time, language, access, motivation, cognitive load', tint: 'EEBD72' },
+    { key: 'response', label: 'Design response', prompt: 'chunking, captions, choice, feedback, supports', tint: 'B8C8CC' }
+  ];
   var KEY = 'threeHourPlanner.v1';
-  var state = load() || { title: '', audience: '', objective: '', total: 180, stages: [] };
+  var state = load() || { title: '', audience: '', objective: '', context: '', barrier: '', response: '', total: 180, stages: [] };
 
   var $ = function (id) { return document.getElementById(id); };
   function uid() { return 's' + Math.random().toString(36).slice(2, 9); }
@@ -181,6 +199,7 @@
   function normalise(s) {
     return {
       title: String(s.title || ''), audience: String(s.audience || ''), objective: String(s.objective || ''),
+      context: String(s.context || ''), barrier: String(s.barrier || ''), response: String(s.response || ''),
       total: num(s.total) || 180,
       stages: s.stages.map(function (x) {
         return { id: uid(), name: String(x.name || ''), mins: num(x.mins), purpose: String(x.purpose || x.outcome || ''), tool: String(x.tool || ''), activity: String(x.activity || ''), udl: String(x.udl || ''), notes: String(x.notes || '') };
@@ -193,6 +212,7 @@
   /* ---------- rendering ---------- */
   function renderMeta() {
     $('title').value = state.title; $('audience').value = state.audience; $('objective').value = state.objective; $('total').value = state.total;
+    VARIABILITY.forEach(function (v) { $('v-' + v.key).value = state[v.key]; });
   }
 
   function renderSummary() {
@@ -300,11 +320,19 @@
   });
   $('clearBtn').addEventListener('click', function () {
     if (!confirm('Clear the title, audience and all parts? Save a copy first if you want to keep them.')) return;
-    state = { title: '', audience: '', objective: '', total: 180, stages: [] }; save(); renderMeta(); renderStages('addBtn');
+    state = { title: '', audience: '', objective: '', context: '', barrier: '', response: '', total: 180, stages: [] }; save(); renderMeta(); renderStages('addBtn');
   });
   $('title').addEventListener('input', function (e) { state.title = e.target.value; save(); });
   $('audience').addEventListener('input', function (e) { state.audience = e.target.value; save(); });
   $('objective').addEventListener('input', function (e) { state.objective = e.target.value; save(); });
+  VARIABILITY.forEach(function (v) {
+    var col = document.createElement('div'); col.className = 'var-col';
+    var l = document.createElement('label'); l.htmlFor = 'v-' + v.key; l.textContent = v.label; l.style.background = hex(v.tint);
+    var h = document.createElement('span'); h.className = 'hint'; h.id = 'vh-' + v.key; h.textContent = v.prompt;
+    var t = document.createElement('textarea'); t.id = 'v-' + v.key; t.placeholder = 'Your notes:'; t.setAttribute('aria-describedby', h.id);
+    t.addEventListener('input', function () { state[v.key] = t.value; save(); });
+    col.appendChild(l); col.appendChild(h); col.appendChild(t); $('varGrid').appendChild(col);
+  });
   $('total').addEventListener('input', function (e) { state.total = num(e.target.value) || 180; renderSummary(); save(); });
 
   /* ---------- exports ---------- */
@@ -318,7 +346,7 @@
   function docTitle() { return state.title.trim() || 'Three-hour package plan'; }
 
   $('jsonBtn').addEventListener('click', function () {
-    var out = { type: 'three-hour-package-plan', version: 1, title: state.title, audience: state.audience, objective: state.objective, total: state.total,
+    var out = { type: 'three-hour-package-plan', version: 1, title: state.title, audience: state.audience, objective: state.objective, context: state.context, barrier: state.barrier, response: state.response, total: state.total,
       stages: state.stages.map(function (s) { return { name: s.name, mins: s.mins, purpose: s.purpose, tool: s.tool, activity: s.activity, udl: s.udl, notes: s.notes }; }) };
     download(new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' }), slug() + '.json');
     announce('Saved ' + slug() + '.json. Check your Downloads folder.');
@@ -345,7 +373,19 @@
       var kids = [];
       kids.push(new D.Paragraph({ heading: D.HeadingLevel.TITLE, children: [new D.TextRun(docTitle())] }));
       kids.push(new D.Paragraph({ children: [new D.TextRun({ text: 'Target audience: ', bold: true }), new D.TextRun(state.audience.trim())] }));
-      kids.push(new D.Paragraph({ children: [new D.TextRun({ text: 'Learning objective: ', bold: true }), new D.TextRun(state.objective.trim())] }));
+      kids.push(new D.Paragraph({ heading: D.HeadingLevel.HEADING_1, children: [new D.TextRun('Map learner variability')] }));
+      function vcell(runs, fill) {
+        return new D.TableCell({ width: { size: 33, type: D.WidthType.PERCENTAGE }, margins: { top: 80, bottom: 80, left: 100, right: 100 },
+          shading: fill ? { type: D.ShadingType.CLEAR, color: 'auto', fill: fill } : undefined, children: runs });
+      }
+      kids.push(new D.Table({ width: { size: 100, type: D.WidthType.PERCENTAGE }, rows: [
+        new D.TableRow({ tableHeader: true, children: VARIABILITY.map(function (v) { return vcell([new D.Paragraph({ children: [new D.TextRun({ text: v.label, bold: true, color: '1B2A41' })] })], v.tint); }) }),
+        new D.TableRow({ children: VARIABILITY.map(function (v) { return vcell([new D.Paragraph({ children: [new D.TextRun(v.prompt)] })]); }) }),
+        new D.TableRow({ height: { value: 2000, rule: D.HeightRule.ATLEAST }, children: VARIABILITY.map(function (v) {
+          return vcell([new D.Paragraph({ children: [new D.TextRun({ text: 'Your notes:', bold: true })] })].concat(lines(state[v.key]).map(function (ln) { return new D.Paragraph({ children: [new D.TextRun(ln)] }); })));
+        }) })
+      ] }));
+      kids.push(new D.Paragraph({ children: [new D.TextRun({ text: 'Learning objective: ', bold: true }), new D.TextRun(state.objective.trim())], spacing: { before: 240 } }));
       kids.push(new D.Paragraph({ children: [new D.TextRun({ text: 'Time: ', bold: true }), new D.TextRun(used() + ' of ' + state.total + ' minutes planned')] }));
       kids.push(new D.Paragraph({ heading: D.HeadingLevel.HEADING_1, children: [new D.TextRun('Overview')] }));
       function cell(t, bold, w) {
@@ -384,6 +424,15 @@
       s1.addText(docTitle(), { x: 0.7, y: 2.3, w: 11.9, h: 1.4, fontFace: FONT, fontSize: 40, bold: true, color: INK, valign: 'bottom' });
       s1.addText('Target audience: ' + state.audience.trim() + '\n' + used() + ' of ' + state.total + ' minutes planned',
         { x: 0.7, y: 3.9, w: 11.9, h: 1.2, fontFace: FONT, fontSize: 22, color: '4A5568', valign: 'top' });
+      var sVar = p.addSlide();
+      sVar.addText('Map learner variability', { x: 0.7, y: 0.4, w: 11.9, h: 0.8, fontFace: FONT, fontSize: 32, bold: true, color: INK });
+      var vgap = 0.3, vw = (11.93 - vgap * 2) / 3;
+      VARIABILITY.forEach(function (v, j) {
+        var x = 0.7 + j * (vw + vgap);
+        sVar.addText(v.label, { x: x, y: 1.5, w: vw, h: 0.7, fontFace: FONT, fontSize: 18, bold: true, align: 'center', valign: 'middle', color: INK, fill: { color: v.tint }, shape: p.ShapeType.roundRect, rectRadius: 0.08 });
+        sVar.addText(v.prompt, { x: x, y: 2.4, w: vw, h: 1.1, fontFace: FONT, fontSize: 16, valign: 'middle', color: INK, fill: { color: 'F5F7FA' }, fit: 'shrink' });
+        sVar.addText([{ text: 'Your notes:', options: { bold: true, breakLine: true } }, { text: state[v.key].trim() || ' ', options: {} }], { x: x, y: 3.7, w: vw, h: 3.0, fontFace: FONT, fontSize: 16, valign: 'top', color: INK, line: { color: '6B7686', width: 1 }, fit: 'shrink' });
+      });
       var sObj = p.addSlide();
       sObj.addText('Learning objective', { x: 0.7, y: 0.4, w: 11.9, h: 0.8, fontFace: FONT, fontSize: 32, bold: true, color: INK });
       sObj.addText(state.objective.trim() || ' ', { x: 0.7, y: 1.5, w: 11.9, h: 5.2, fontFace: FONT, fontSize: 26, color: INK, valign: 'top', fit: 'shrink' });
@@ -429,6 +478,8 @@
     function el(tag, text, parent) { var e = document.createElement(tag); if (text !== undefined) e.textContent = text; (parent || pv).appendChild(e); return e; }
     el('h1', docTitle());
     var pa = el('p'); el('strong', 'Target audience: ', pa); pa.appendChild(document.createTextNode(state.audience.trim() || '\u00a0'));
+    el('h2', 'Map learner variability');
+    VARIABILITY.forEach(function (v) { var pv2 = el('p'); el('strong', v.label + ' (' + v.prompt + '): ', pv2); pv2.appendChild(document.createTextNode(state[v.key].trim() || '\u00a0')); });
     var po = el('p'); el('strong', 'Learning objective: ', po); po.appendChild(document.createTextNode(state.objective.trim() || '\u00a0'));
     el('p', used() + ' of ' + state.total + ' minutes planned');
     var t = el('table'); var cap = el('caption', 'Overview of parts and minutes', t); cap.style.textAlign = 'left';
