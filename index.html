@@ -116,7 +116,7 @@
   </section>
 
   <section aria-labelledby="obj-h">
-    <h2 id="obj-h">Learning objective</h2>
+    <h2 id="obj-h">Learning outcome/s</h2>
     <span class="hint" id="objective-h" style="display:block;margin-bottom:.25rem">By the end of the package, learners will be able to&hellip;</span>
     <textarea id="objective" aria-labelledby="obj-h" aria-describedby="objective-h"></textarea>
   </section>
@@ -385,7 +385,7 @@
           return vcell([new D.Paragraph({ children: [new D.TextRun({ text: 'Your notes:', bold: true })] })].concat(lines(state[v.key]).map(function (ln) { return new D.Paragraph({ children: [new D.TextRun(ln)] }); })));
         }) })
       ] }));
-      kids.push(new D.Paragraph({ children: [new D.TextRun({ text: 'Learning objective: ', bold: true }), new D.TextRun(state.objective.trim())], spacing: { before: 240 } }));
+      kids.push(new D.Paragraph({ children: [new D.TextRun({ text: 'Learning outcome/s: ', bold: true }), new D.TextRun(state.objective.trim())], spacing: { before: 240 } }));
       kids.push(new D.Paragraph({ children: [new D.TextRun({ text: 'Time: ', bold: true }), new D.TextRun(used() + ' of ' + state.total + ' minutes planned')] }));
       kids.push(new D.Paragraph({ heading: D.HeadingLevel.HEADING_1, children: [new D.TextRun('Overview')] }));
       function cell(t, bold, w) {
@@ -434,7 +434,7 @@
         sVar.addText([{ text: 'Your notes:', options: { bold: true, breakLine: true } }, { text: state[v.key].trim() || ' ', options: {} }], { x: x, y: 3.7, w: vw, h: 3.0, fontFace: FONT, fontSize: 16, valign: 'top', color: INK, line: { color: '6B7686', width: 1 }, fit: 'shrink' });
       });
       var sObj = p.addSlide();
-      sObj.addText('Learning objective', { x: 0.7, y: 0.4, w: 11.9, h: 0.8, fontFace: FONT, fontSize: 32, bold: true, color: INK });
+      sObj.addText('Learning outcome/s', { x: 0.7, y: 0.4, w: 11.9, h: 0.8, fontFace: FONT, fontSize: 32, bold: true, color: INK });
       sObj.addText(state.objective.trim() || ' ', { x: 0.7, y: 1.5, w: 11.9, h: 5.2, fontFace: FONT, fontSize: 26, color: INK, valign: 'top', fit: 'shrink' });
 
       var rowsDef = [['name', 0.7], ['purpose', 1.1], ['tool', 0.8], ['activity', 1.0], ['udl', 1.0], ['mins', 0.6]];
@@ -480,7 +480,7 @@
     var pa = el('p'); el('strong', 'Target audience: ', pa); pa.appendChild(document.createTextNode(state.audience.trim() || '\u00a0'));
     el('h2', 'Map learner variability');
     VARIABILITY.forEach(function (v) { var pv2 = el('p'); el('strong', v.label + ' (' + v.prompt + '): ', pv2); pv2.appendChild(document.createTextNode(state[v.key].trim() || '\u00a0')); });
-    var po = el('p'); el('strong', 'Learning objective: ', po); po.appendChild(document.createTextNode(state.objective.trim() || '\u00a0'));
+    var po = el('p'); el('strong', 'Learning outcome/s: ', po); po.appendChild(document.createTextNode(state.objective.trim() || '\u00a0'));
     el('p', used() + ' of ' + state.total + ' minutes planned');
     var t = el('table'); var cap = el('caption', 'Overview of parts and minutes', t); cap.style.textAlign = 'left';
     var hr = el('tr', undefined, t); ['Part', 'Name', 'Minutes'].forEach(function (h) { el('th', h, hr).scope = 'col'; });
